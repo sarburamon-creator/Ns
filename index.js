@@ -1,4 +1,14 @@
-const { 
+const express = require("express");
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Endpoint simplu
+app.get("/", (req, res) => {
+    res.send("Botul este online! 🚀");
+});
+
+// Pornirea serverului
+app.listen(PORT, () => console.log(`Serverul rulează pe port ${PORT}`));const { 
     Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, 
     EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder
 } = require("discord.js");
