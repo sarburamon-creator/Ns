@@ -1,15 +1,23 @@
 const { 
     Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, 
-    EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, AttachmentBuilder
+    EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder
 } = require("discord.js");
 require("dotenv").config();
 
+// ---------------- CONFIG ----------------
 const CHANNEL_ID = "1442239451534332049"; 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
+// ----------------------------------------
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({ 
+    intents: [
+        GatewayIntentBits.Guilds, 
+        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.MessageContent
+    ] 
+});
 
 // ================= REGISTER COMMAND =================
 const commands = [
@@ -45,6 +53,9 @@ async function registerCommands() {
     }
 }
 
+// ================= GIVEAWAYS STORAGE =================
+const giveaways = new Map(); // messageId => array de userId
+
 // ================= HANDLE COMMAND =================
 client.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
@@ -58,10 +69,10 @@ client.on("interactionCreate", async interaction => {
     const channel = await client.channels.fetch(CHANNEL_ID);
     let imageURL;
 
+    // FETCH IMAGE FROM ATTACHMENT
     try {
         const msg = await channel.messages.fetch(messageId);
         if (msg.attachments.size > 0) {
-            // luăm prima imagine
             imageURL = msg.attachments.first().url;
         } else {
             return interaction.reply({ content: "Mesajul nu conține nicio imagine.", ephemeral: true });
@@ -70,6 +81,7 @@ client.on("interactionCreate", async interaction => {
         return interaction.reply({ content: "Nu am găsit mesajul cu ID-ul dat.", ephemeral: true });
     }
 
+    // CREATE EMBED
     const embed = new EmbedBuilder()
         .setTitle(`${title} ⭐`)
         .setDescription(
@@ -82,6 +94,7 @@ client.on("interactionCreate", async interaction => {
         .setImage(imageURL)
         .setFooter({ text: "Entries: 0" });
 
+    // BUTTON
     const button = new ButtonBuilder()
         .setCustomId("enter_giveaway")
         .setEmoji("⭐")
@@ -89,7 +102,11 @@ client.on("interactionCreate", async interaction => {
 
     const row = new ActionRowBuilder().addComponents(button);
 
-    await channel.send({ embeds: [embed], components: [row] });
+    // SEND GIVEAWAY
+    const giveawayMessage = await channel.send({ embeds: [embed], components: [row] });
+
+    // INITIALIZE PARTICIPANTS
+    giveaways.set(giveawayMessage.id, []);
 
     await interaction.reply({ content: "Giveaway creat cu succes! 🎉", ephemeral: true });
 });
@@ -99,7 +116,35 @@ client.on("interactionCreate", async interaction => {
     if (!interaction.isButton()) return;
     if (interaction.customId !== "enter_giveaway") return;
 
-    await interaction.reply({ content: "Te-ai înscris în giveaway! ⭐", ephemeral: true });
+    const message = interaction.message;
+
+    if (!giveaways.has(message.id)) {
+        giveaways.set(message.id, []);
+    }
+
+    const participants = giveaways.get(message.id);
+
+    // CHECK IF USER ALREADY ENTERED
+    if (participants.includes(interaction.user.id)) {
+        return interaction.reply({
+            content: "Ești deja înscris în giveaway!",
+            ephemeral: true
+        });
+    }
+
+    participants.push(interaction.user.id);
+    giveaways.set(message.id, participants);
+
+    // UPDATE EMBED
+    const embed = EmbedBuilder.from(message.embeds[0]);
+    embed.setFooter({ text: `Entries: ${participants.length}` });
+
+    await message.edit({ embeds: [embed] });
+
+    await interaction.reply({
+        content: "Te-ai înscris în giveaway! ⭐",
+        ephemeral: true
+    });
 });
 
 // ================= START BOT =================
